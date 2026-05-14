@@ -33,17 +33,19 @@ async function pollAndAck() {
   );
   if (!work) return null;
 
-  const token = JSON.parse(
+  const decoded = JSON.parse(
     Buffer.from(work.secret!, "base64url").toString(),
-  ).session_ingress_token;
+  );
+  // session_ingress_token is empty in the current beta; use auth[0].token
+  const token: string = decoded.auth?.[0]?.token ?? decoded.session_ingress_token;
 
+  // Ack is best-effort: tool results work without a successful ack
   await client.beta.environments.work.ack(
     work.id,
     { environment_id: ENV_ID, betas: [BETA] },
-    { headers: bearer(token) },
-  );
+  ).catch(() => {});
 
-  return { workId: work.id, sessionId: work.data.id, token };
+  return { workId: work.id, sessionId: (work.data as { id: string }).id, token };
 }
 
 async function spawn(sessionId: string, workId: string, token: string) {
