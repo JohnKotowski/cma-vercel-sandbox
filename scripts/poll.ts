@@ -3,8 +3,6 @@
  * Run this instead of the webhook during local development.
  * No deployment or public URL needed.
  */
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
 
 import Anthropic from "@anthropic-ai/sdk";
 import { Sandbox } from "@vercel/sandbox";
@@ -63,20 +61,19 @@ async function main() {
       continue;
     }
 
-    console.log(`Work item received: ${work.id}`);
+    const sessionId: string = (work.data as { id: string }).id;
+    console.log(`Work item received: session=${sessionId}`);
 
-    const token = JSON.parse(
-      Buffer.from(work.secret!, "base64url").toString(),
-    ).session_ingress_token;
-
+    // Ack is best-effort — the session event flow works regardless
     await client.beta.environments.work.ack(
       work.id,
       { environment_id: ENV_ID, betas: [BETA] },
-      { headers: bearer(token) },
-    );
+    ).catch((e: Error) => console.warn("Ack failed (continuing):", e.message));
 
-    console.log(`Acked work item ${work.id}`);
-    spawn(work.data.id, work.id, token).catch((e: Error) =>
+    const decoded = JSON.parse(Buffer.from(work.secret!, "base64url").toString());
+    const token: string = decoded.auth?.[0]?.token ?? decoded.session_ingress_token;
+
+    spawn(sessionId, work.id, token).catch((e: Error) =>
       console.error("Spawn error:", e.message)
     );
   }

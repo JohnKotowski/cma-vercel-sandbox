@@ -28,7 +28,7 @@ function verify(body: string, header: string | null): boolean {
 async function pollAndAck() {
   const work = await client.beta.environments.work.poll(
     ENV_ID,
-    { x_environment_runner_version: "0.1.0", betas: [BETA] },
+    { "x-environment-runner-version": "0.1.0", betas: [BETA] },
     { headers: bearer(SERVICE_KEY) },
   );
   if (!work) return null;

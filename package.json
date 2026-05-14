@@ -11,7 +11,9 @@
     "create-agent": "tsx scripts/create-agent.ts",
     "build-snapshot": "tsx scripts/build-snapshot.ts",
     "poll": "tsx scripts/poll.ts",
-    "test-session": "tsx scripts/test-session.ts"
+    "test-session": "tsx scripts/test-session.ts",
+    "read-session": "tsx scripts/read-session.ts",
+    "run-session": "tsx scripts/run-session.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "https://app.stainless.com/pkg/s/anthropic-typescript/a043b7d798db66dd1f1dcfd5fd85711bc3fca537/dist.tar.gz",
@@ -25,7 +27,11 @@
     "tsx": "^4.21.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -1,5 +1,3 @@
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
 
 import { Sandbox } from "@vercel/sandbox";
 import { readFileSync } from "node:fs";

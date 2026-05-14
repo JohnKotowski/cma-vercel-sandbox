@@ -8,8 +8,9 @@ const SESSION_ID = process.env.SESSION_ID!;
 const TOKEN = process.env.TOKEN!;
 const BETA = "environments-2026-03-01";
 
-const client = new Anthropic({ apiKey: process.env.API_KEY! });
-const bearer = (t: string) => ({ authorization: `Bearer ${t}` });
+const apiClient = new Anthropic({ apiKey: process.env.API_KEY! });
+// heartbeat and stop authenticate with the session token, not the API key
+const tokenClient = new Anthropic({ authToken: TOKEN });
 const handled = new Set<string>();
 
 // --- Tool implementations ---
@@ -30,14 +31,13 @@ async function runTool(name: string, input: unknown): Promise<string> {
 let last: string | undefined;
 const hb = setInterval(async () => {
   try {
-    const r = await client.beta.environments.work.heartbeat(
+    const r = await tokenClient.beta.environments.work.heartbeat(
       WORK_ID,
       {
         environment_id: ENV_ID,
         expected_last_heartbeat: last,
         betas: [BETA],
       },
-      { headers: bearer(TOKEN) },
     );
     last = r.last_heartbeat;
   } catch {}
@@ -49,7 +49,7 @@ async function handleTool(ev: { id: string; name: string; input: unknown }) {
   const output = await runTool(ev.name, ev.input).catch((e) =>
     `error: ${e instanceof Error ? e.message : String(e)}`
   );
-  await client.beta.sessions.events.send(SESSION_ID, {
+  await apiClient.beta.sessions.events.send(SESSION_ID, {
     events: [{
       type: "user.custom_tool_result",
       custom_tool_use_id: ev.id,
@@ -62,7 +62,7 @@ async function handleTool(ev: { id: string; name: string; input: unknown }) {
 // --- Main loop ---
 
 try {
-  for await (const ev of client.beta.sessions.events.list(
+  for await (const ev of apiClient.beta.sessions.events.list(
     SESSION_ID, { limit: 1000 }
   )) {
     if (ev.type === "agent.custom_tool_use" && !handled.has(ev.id)) {
@@ -72,7 +72,7 @@ try {
     }
   }
 
-  const stream = await client.beta.sessions.events.stream(SESSION_ID);
+  const stream = await apiClient.beta.sessions.events.stream(SESSION_ID);
   for await (const ev of stream) {
     if (ev.type === "agent.custom_tool_use" && !handled.has(ev.id)) {
       await handleTool(ev);
@@ -80,11 +80,7 @@ try {
   }
 } finally {
   clearInterval(hb);
-  await client.beta.environments.work
-    .stop(
-      WORK_ID,
-      { environment_id: ENV_ID, betas: [BETA] },
-      { headers: bearer(TOKEN) },
-    )
+  await tokenClient.beta.environments.work
+    .stop(WORK_ID, { environment_id: ENV_ID, betas: [BETA] })
     .catch((e) => { if (e?.status !== 409) throw e; });
 }
