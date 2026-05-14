@@ -1,5 +1,3 @@
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -25,7 +23,10 @@ async function main() {
   console.log("Sending message...");
 
   await client.beta.sessions.events.send(session.id, {
-    events: [{ type: "user.message", content: "run `uname -a && node --version`" }],
+    events: [{
+      type: "user.message",
+      content: [{ type: "text", text: "run `uname -a && node --version`" }],
+    }],
   });
 
   console.log("\nSession started. Watch the poll loop logs for the work item.");

@@ -1,5 +1,3 @@
-import { config } from "dotenv";
-config({ path: ".env.local", override: true });
 
 import Anthropic from "@anthropic-ai/sdk";
 
