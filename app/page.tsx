@@ -1,65 +1,146 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useRef } from "react";
+
+type Event =
+  | { type: "tool_use"; name: string; input: unknown }
+  | { type: "tool_result"; content: Array<{ text?: string }> }
+  | { type: "message"; text: string }
+  | { type: "done" }
+  | { type: "error"; message: string };
 
 export default function Home() {
+  const [message, setMessage] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const esRef = useRef<EventSource | null>(null);
+
+  async function run() {
+    if (!message.trim() || status === "running") return;
+    setEvents([]);
+    setSessionId(null);
+    setStatus("running");
+
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    const { sessionId: id, error } = await res.json();
+    if (error) {
+      setStatus("error");
+      setEvents([{ type: "error", message: error }]);
+      return;
+    }
+    setSessionId(id);
+
+    esRef.current?.close();
+    const es = new EventSource(`/api/session/${id}`);
+    esRef.current = es;
+
+    es.addEventListener("tool_use", (e) => {
+      const data = JSON.parse(e.data);
+      setEvents(prev => [...prev, { type: "tool_use", name: data.name, input: data.input }]);
+    });
+    es.addEventListener("tool_result", (e) => {
+      const data = JSON.parse(e.data);
+      setEvents(prev => [...prev, { type: "tool_result", content: data.content }]);
+    });
+    es.addEventListener("message", (e) => {
+      const data = JSON.parse(e.data);
+      setEvents(prev => [...prev, { type: "message", text: data.text }]);
+    });
+    es.addEventListener("done", () => {
+      setStatus("done");
+      es.close();
+    });
+    es.addEventListener("error", (e) => {
+      const data = JSON.parse((e as MessageEvent).data ?? "{}");
+      setEvents(prev => [...prev, { type: "error", message: data.message ?? "stream error" }]);
+      setStatus("error");
+      es.close();
+    });
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center px-4 py-16">
+      <div className="w-full max-w-2xl flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+            CMA Vercel Sandbox
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Run a prompt against a Claude agent with a private Vercel Sandbox.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="flex flex-col gap-3">
+          <textarea
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-none"
+            rows={4}
+            placeholder="run `uname -a && node --version`"
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); }}
+          />
+          <button
+            onClick={run}
+            disabled={status === "running" || !message.trim()}
+            className="self-end rounded-lg bg-zinc-900 dark:bg-zinc-50 px-5 py-2 text-sm font-medium text-zinc-50 dark:text-zinc-900 transition-opacity disabled:opacity-40 hover:opacity-80"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {status === "running" ? "Running…" : "Run"}
+          </button>
         </div>
-      </main>
+
+        {sessionId && (
+          <p className="text-xs text-zinc-400 font-mono">session: {sessionId}</p>
+        )}
+
+        {events.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {events.map((ev, i) => {
+              if (ev.type === "tool_use") return (
+                <div key={i} className="rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-4 py-3">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">
+                    tool: {ev.name}
+                  </p>
+                  <pre className="text-xs text-amber-900 dark:text-amber-100 whitespace-pre-wrap break-all">
+                    {JSON.stringify(ev.input, null, 2)}
+                  </pre>
+                </div>
+              );
+              if (ev.type === "tool_result") return (
+                <div key={i} className="rounded-lg bg-zinc-100 dark:bg-zinc-800 px-4 py-3">
+                  <p className="text-xs font-medium text-zinc-500 mb-1">result</p>
+                  <pre className="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-all">
+                    {ev.content.map(c => c.text ?? "").join("")}
+                  </pre>
+                </div>
+              );
+              if (ev.type === "message") return (
+                <div key={i} className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                  <p className="text-xs font-medium text-zinc-500 mb-1">agent</p>
+                  <p className="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">{ev.text}</p>
+                </div>
+              );
+              if (ev.type === "error") return (
+                <div key={i} className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3">
+                  <p className="text-xs font-medium text-red-700 dark:text-red-300">error</p>
+                  <p className="text-sm text-red-900 dark:text-red-100">{ev.message}</p>
+                </div>
+              );
+              return null;
+            })}
+          </div>
+        )}
+
+        {status === "running" && events.length === 0 && (
+          <div className="text-sm text-zinc-400 animate-pulse">
+            Waiting for agent…
+          </div>
+        )}
+      </div>
     </div>
   );
 }
