@@ -1,4 +1,4 @@
-# CMA Vercel Sandbox
+# Claude Managed Agents with Vercel Sandbox
 
 Run [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) custom tools inside a [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) Firecracker microVM. One fresh VM per session, snapshot-backed cold starts, and credential brokering through the sandbox firewall.
 
