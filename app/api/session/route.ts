@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const session = await client.beta.sessions.create({
     agent: process.env.ANTHROPIC_AGENT_ID!,
     environment_id: process.env.ANTHROPIC_ENVIRONMENT_ID!,
-    betas: ["environments-2026-03-01"],
+    betas: ["managed-agents-2026-04-01"],
   });
 
   await client.beta.sessions.events.send(session.id, {

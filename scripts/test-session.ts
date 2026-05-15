@@ -16,7 +16,7 @@ async function main() {
   const session = await client.beta.sessions.create({
     agent: AGENT_ID,
     environment_id: ENVIRONMENT_ID,
-    betas: ["environments-2026-03-01"],
+    betas: ["managed-agents-2026-04-01"],
   });
 
   console.log("Session ID:", session.id);

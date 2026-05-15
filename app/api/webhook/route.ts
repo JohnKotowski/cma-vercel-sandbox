@@ -8,7 +8,7 @@ const ENV_ID = process.env.ANTHROPIC_ENVIRONMENT_ID!;
 const ENV_KEY = process.env.ANTHROPIC_ENVIRONMENT_KEY!;
 const SNAPSHOT_ID = process.env.SANDBOX_SNAPSHOT_ID!;
 const WEBHOOK_SECRET = process.env.ANTHROPIC_WEBHOOK_SECRET!;
-const BETA = "environments-2026-03-01";
+const BETA = "managed-agents-2026-04-01";
 
 const client = new Anthropic({ authToken: ENV_KEY });
 
