@@ -13,10 +13,11 @@
     "poll": "tsx scripts/poll.ts",
     "test-session": "tsx scripts/test-session.ts",
     "read-session": "tsx scripts/read-session.ts",
-    "run-session": "tsx scripts/run-session.ts"
+    "run-session": "tsx scripts/run-session.ts",
+    "test-e2e": "tsx scripts/test-e2e.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "https://app.stainless.com/pkg/s/anthropic-typescript/a043b7d798db66dd1f1dcfd5fd85711bc3fca537/dist.tar.gz",
+    "@anthropic-ai/sdk": "https://app.stainless.com/pkg/s/anthropic-typescript/11dd7e25acfec7caffc11c06d11629f42846b595/dist.tar.gz",
     "@vercel/functions": "^3.5.1",
     "@vercel/sandbox": "^1.10.2",
     "dotenv": "^17.4.2",
