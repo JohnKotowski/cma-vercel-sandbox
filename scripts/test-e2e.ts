@@ -31,16 +31,22 @@ async function main() {
   });
 
   let work = null;
-  for (let i = 0; i < 30; i++) {
-    const item = await worker.beta.environments.work.poll(ENV_ID, { betas: [BETA] });
+  for (let i = 0; i < 60; i++) {
+    const item = await worker.beta.environments.work.poll(ENV_ID, {
+      betas: [BETA],
+      reclaim_older_than_ms: 1000,
+    });
     if (item?.data.type === "session" && item.data.id === session.id) {
       work = item;
       break;
     }
+    if (item) {
+      console.log("skipping unrelated work item:", item.id);
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (!work) {
-    console.error("no work item after 30s");
+    console.error("no work item after 60s");
     process.exit(1);
   }
 
