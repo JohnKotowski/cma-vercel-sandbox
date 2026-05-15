@@ -10,7 +10,7 @@ const ENV_ID = process.env.ANTHROPIC_ENVIRONMENT_ID!;
 const ENV_KEY = process.env.ANTHROPIC_ENVIRONMENT_KEY!;
 const SNAPSHOT = process.env.SANDBOX_SNAPSHOT_ID!;
 const AGENT = process.env.ANTHROPIC_AGENT_ID!;
-const BETA = "environments-2026-03-01";
+const BETA = "managed-agents-2026-04-01";
 
 async function main() {
   const api = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

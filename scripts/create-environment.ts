@@ -7,7 +7,7 @@ async function main() {
   const environment = await client.beta.environments.create({
     name: "vercel-sandbox",
     config: { type: "self_hosted" },
-    betas: ["environments-2026-03-01"],
+    betas: ["managed-agents-2026-04-01"],
   });
 
   console.log("Environment created:");

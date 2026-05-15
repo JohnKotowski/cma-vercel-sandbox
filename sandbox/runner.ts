@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const ENV_ID = process.env.ENVIRONMENT_ID!;
 const WORK_ID = process.env.WORK_ID!;
 const SESSION_ID = process.env.SESSION_ID!;
-const BETA = "environments-2026-03-01";
+const BETA = "managed-agents-2026-04-01";
 
 const client = new Anthropic({
   authToken: process.env.ANTHROPIC_ENVIRONMENT_KEY!,
