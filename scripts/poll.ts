@@ -1,7 +1,6 @@
 /**
  * Local poll-based control plane.
  * Run this instead of the webhook during local development.
- * No deployment or public URL needed.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -9,15 +8,13 @@ import { Sandbox } from "@vercel/sandbox";
 import ms from "ms";
 
 const ENV_ID = process.env.ANTHROPIC_ENVIRONMENT_ID!;
-const SERVICE_KEY = process.env.ENVIRONMENT_SERVICE_KEY!;
+const ENV_KEY = process.env.ANTHROPIC_ENVIRONMENT_KEY!;
 const SNAPSHOT_ID = process.env.SANDBOX_SNAPSHOT_ID!;
-const API_KEY = process.env.ANTHROPIC_API_KEY!;
 const BETA = "environments-2026-03-01";
 
-const client = new Anthropic({ apiKey: API_KEY });
-const bearer = (t: string) => ({ authorization: `Bearer ${t}` });
+const client = new Anthropic({ authToken: ENV_KEY });
 
-async function spawn(sessionId: string, workId: string, token: string) {
+async function spawn(sessionId: string, workId: string) {
   console.log(`Spawning sandbox for session ${sessionId}...`);
   const sandbox = await Sandbox.create({
     source: { type: "snapshot", snapshotId: SNAPSHOT_ID },
@@ -33,8 +30,7 @@ async function spawn(sessionId: string, workId: string, token: string) {
       ENVIRONMENT_ID: ENV_ID,
       WORK_ID: workId,
       SESSION_ID: sessionId,
-      API_KEY,
-      TOKEN: token,
+      ANTHROPIC_ENVIRONMENT_KEY: ENV_KEY,
     },
     detached: true,
   });
@@ -49,8 +45,7 @@ async function main() {
   for (;;) {
     const work = await client.beta.environments.work.poll(
       ENV_ID,
-      { "x-environment-runner-version": "0.1.0", betas: [BETA] },
-      { headers: bearer(SERVICE_KEY) },
+      { betas: [BETA] },
     ).catch((e: Error) => {
       console.error("Poll error:", e.message);
       return null;
@@ -61,20 +56,18 @@ async function main() {
       continue;
     }
 
-    const sessionId: string = (work.data as { id: string }).id;
+    if (work.data.type !== "session") continue;
+
+    const sessionId = work.data.id;
     console.log(`Work item received: session=${sessionId}`);
 
-    // Ack is best-effort — the session event flow works regardless
-    await client.beta.environments.work.ack(
-      work.id,
-      { environment_id: ENV_ID, betas: [BETA] },
-    ).catch((e: Error) => console.warn("Ack failed (continuing):", e.message));
+    await client.beta.environments.work.ack(work.id, {
+      environment_id: ENV_ID,
+      betas: [BETA],
+    });
 
-    const decoded = JSON.parse(Buffer.from(work.secret!, "base64url").toString());
-    const token: string = decoded.auth?.[0]?.token ?? decoded.session_ingress_token;
-
-    spawn(sessionId, work.id, token).catch((e: Error) =>
-      console.error("Spawn error:", e.message)
+    spawn(sessionId, work.id).catch((e: Error) =>
+      console.error("Spawn error:", e.message),
     );
   }
 }

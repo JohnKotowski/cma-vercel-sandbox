@@ -3,7 +3,7 @@ import { Sandbox } from "@vercel/sandbox";
 import { readFileSync } from "node:fs";
 
 const SDK_URL =
-  "https://app.stainless.com/pkg/s/anthropic-typescript/a043b7d798db66dd1f1dcfd5fd85711bc3fca537/dist.tar.gz";
+  "https://app.stainless.com/pkg/s/anthropic-typescript/11dd7e25acfec7caffc11c06d11629f42846b595/dist.tar.gz";
 
 async function main() {
   console.log("Creating sandbox...");
