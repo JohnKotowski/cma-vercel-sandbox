@@ -7,9 +7,9 @@ const WORK_ID = process.env.WORK_ID!;
 const SESSION_ID = process.env.SESSION_ID!;
 const BETA = "managed-agents-2026-04-01";
 
-const client = new Anthropic({
-  authToken: process.env.ANTHROPIC_ENVIRONMENT_KEY!,
-});
+// Auth is injected at the sandbox firewall (credential brokering),
+// so the SDK only needs a placeholder here. The real key never enters the VM.
+const client = new Anthropic({ authToken: "_brokered_" });
 const handled = new Set<string>();
 
 async function runTool(name: string, input: unknown): Promise<string> {

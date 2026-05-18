@@ -61,6 +61,15 @@ async function main() {
     source: { type: "snapshot", snapshotId: SNAPSHOT },
     runtime: "node24",
     timeout: ms("10m"),
+    networkPolicy: {
+      allow: {
+        "api.anthropic.com": [{
+          transform: [{
+            headers: { authorization: `Bearer ${ENV_KEY}` },
+          }],
+        }],
+      },
+    },
   });
   await sandbox.runCommand({
     cmd: "npx",
@@ -70,7 +79,6 @@ async function main() {
       ENVIRONMENT_ID: ENV_ID,
       WORK_ID: work.id,
       SESSION_ID: session.id,
-      ANTHROPIC_ENVIRONMENT_KEY: ENV_KEY,
     },
     detached: true,
   });
