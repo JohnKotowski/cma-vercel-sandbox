@@ -27,18 +27,31 @@ async function pollAndAck() {
 }
 
 async function spawn(sessionId: string, workId: string) {
+  // Broker auth at the firewall, but only attach it to endpoints scoped
+  // to THIS session and work item. A compromised sandbox can't use the
+  // injected auth to call /work/poll or read other sessions.
+  const inject = [{ headers: { authorization: `Bearer ${ENV_KEY}` } }];
+
   const sandbox = await Sandbox.create({
     source: { type: "snapshot", snapshotId: SNAPSHOT_ID },
     runtime: "node24",
     timeout: ms("1h"),
-    // Broker the environment key at the firewall so it never enters the VM.
     networkPolicy: {
       allow: {
-        "api.anthropic.com": [{
-          transform: [{
-            headers: { authorization: `Bearer ${ENV_KEY}` },
-          }],
-        }],
+        "api.anthropic.com": [
+          {
+            match: { path: { startsWith: `/v1/sessions/${sessionId}/` } },
+            transform: inject,
+          },
+          {
+            match: {
+              path: {
+                startsWith: `/v1/environments/${ENV_ID}/work/${workId}/`,
+              },
+            },
+            transform: inject,
+          },
+        ],
       },
     },
   });
