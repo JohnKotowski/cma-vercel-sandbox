@@ -31,6 +31,16 @@ async function spawn(sessionId: string, workId: string) {
     source: { type: "snapshot", snapshotId: SNAPSHOT_ID },
     runtime: "node24",
     timeout: ms("1h"),
+    // Broker the environment key at the firewall so it never enters the VM.
+    networkPolicy: {
+      allow: {
+        "api.anthropic.com": [{
+          transform: [{
+            headers: { authorization: `Bearer ${ENV_KEY}` },
+          }],
+        }],
+      },
+    },
   });
 
   await sandbox.runCommand({
@@ -41,7 +51,6 @@ async function spawn(sessionId: string, workId: string) {
       ENVIRONMENT_ID: ENV_ID,
       WORK_ID: workId,
       SESSION_ID: sessionId,
-      ANTHROPIC_ENVIRONMENT_KEY: ENV_KEY,
     },
     detached: true,
   });
