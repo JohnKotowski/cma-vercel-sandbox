@@ -33,7 +33,7 @@ pnpm tsx scripts/create-agent.ts        # → ANTHROPIC_AGENT_ID
 pnpm tsx scripts/build-snapshot.ts      # → SANDBOX_SNAPSHOT_ID
 ```
 
-Add the printed IDs to `.env.local`. Generate an environment key in the Anthropic console and save it as `ANTHROPIC_ENVIRONMENT_KEY`.
+Add the printed IDs to `.env.local`. Generate an environment key in the [Anthropic dashboard](https://platform.claude.com/dashboard) and save it as `ANTHROPIC_ENVIRONMENT_KEY`.
 
 ### Test locally
 
@@ -61,7 +61,7 @@ vercel env add ANTHROPIC_WEBHOOK_SECRET
 vercel deploy --prod
 ```
 
-Register a webhook in the Anthropic console for `session.status_run_started`, pointing at:
+Register a webhook in the [Anthropic dashboard](https://platform.claude.com/dashboard) for `session.status_run_started`, pointing at:
 
 ```
 https://your-project.vercel.app/api/webhook?x-vercel-protection-bypass=<bypass-secret>
@@ -76,7 +76,7 @@ https://your-project.vercel.app/api/webhook?x-vercel-protection-bypass=<bypass-s
 | `ANTHROPIC_AGENT_ID` | Agent ID (`agent_01...`) |
 | `ANTHROPIC_ENVIRONMENT_KEY` | Environment key for poll, ack, and sandbox runner |
 | `SANDBOX_SNAPSHOT_ID` | Snapshot ID from `build-snapshot.ts` |
-| `ANTHROPIC_WEBHOOK_SECRET` | Webhook signing secret from Anthropic console |
+| `ANTHROPIC_WEBHOOK_SECRET` | Webhook signing secret from the Anthropic dashboard |
 
 ## Project structure
 
