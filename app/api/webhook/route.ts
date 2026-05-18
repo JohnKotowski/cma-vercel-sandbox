@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Sandbox } from "@vercel/sandbox";
 import { waitUntil } from "@vercel/functions";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import ms from "ms";
 
 const ENV_ID = process.env.ANTHROPIC_ENVIRONMENT_ID!;
@@ -11,17 +10,6 @@ const WEBHOOK_SECRET = process.env.ANTHROPIC_WEBHOOK_SECRET!;
 const BETA = "managed-agents-2026-04-01";
 
 const client = new Anthropic({ authToken: ENV_KEY });
-
-function verify(body: string, header: string | null): boolean {
-  const [ver, ts, sig] = (header ?? "").split(",");
-  if (ver !== "v1" || !ts || !sig) return false;
-  if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
-  const mac = createHmac("sha256", WEBHOOK_SECRET)
-    .update(`${ts}.${body}`)
-    .digest("hex");
-  if (mac.length !== sig.length) return false;
-  return timingSafeEqual(Buffer.from(mac), Buffer.from(sig));
-}
 
 async function pollAndAck() {
   const work = await client.beta.environments.work.poll(ENV_ID, {
@@ -62,12 +50,17 @@ async function spawn(sessionId: string, workId: string) {
 export async function POST(req: Request): Promise<Response> {
   const body = await req.text();
 
-  if (!verify(body, req.headers.get("x-webhook-signature"))) {
+  let event;
+  try {
+    event = client.beta.webhooks.unwrap(body, {
+      headers: Object.fromEntries(req.headers),
+      key: WEBHOOK_SECRET,
+    });
+  } catch {
     return new Response("bad signature", { status: 401 });
   }
 
-  const payload = JSON.parse(body);
-  if (payload.data.type !== "session.status_run_started") {
+  if (event.data.type !== "session.status_run_started") {
     return new Response("ignored");
   }
 
