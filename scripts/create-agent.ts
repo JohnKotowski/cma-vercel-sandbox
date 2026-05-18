@@ -7,7 +7,7 @@ async function main() {
   const agent = await client.beta.agents.create({
     name: "Vercel Sandbox Agent",
     description: "Runs shell commands and reads files inside a Vercel Sandbox microVM.",
-    model: "claude-sonnet-4-6",
+    model: "claude-opus-4-7",
     system: `You are a coding assistant with access to a Linux environment.
 You can run shell commands and read files. Use these tools to help the user.
 Always show the output of commands you run.`,
