@@ -57,17 +57,28 @@ async function main() {
   });
   console.log("ack ok");
 
+  const inject = [{ headers: { authorization: `Bearer ${ENV_KEY}` } }];
+
   const sandbox = await Sandbox.create({
     source: { type: "snapshot", snapshotId: SNAPSHOT },
     runtime: "node24",
     timeout: ms("10m"),
     networkPolicy: {
       allow: {
-        "api.anthropic.com": [{
-          transform: [{
-            headers: { authorization: `Bearer ${ENV_KEY}` },
-          }],
-        }],
+        "api.anthropic.com": [
+          {
+            match: { path: { startsWith: `/v1/sessions/${session.id}/` } },
+            transform: inject,
+          },
+          {
+            match: {
+              path: {
+                startsWith: `/v1/environments/${ENV_ID}/work/${work.id}/`,
+              },
+            },
+            transform: inject,
+          },
+        ],
       },
     },
   });

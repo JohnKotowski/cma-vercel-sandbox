@@ -15,8 +15,8 @@ importers:
         specifier: ^3.5.1
         version: 3.5.1
       '@vercel/sandbox':
-        specifier: ^1.10.2
-        version: 1.10.2
+        specifier: 2.0.0-beta.21
+        version: 2.0.0-beta.21
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -894,8 +894,8 @@ packages:
     resolution: {integrity: sha512-H6B+/ig/GoahccL3WZjiHayHw1H5KhvTJNceqYulwfK9kkz5iul2hTmYzcJ7tTCQzyd0dutuL9xYFZCyLUqsog==}
     engines: {node: '>= 20'}
 
-  '@vercel/sandbox@1.10.2':
-    resolution: {integrity: sha512-rWhYfIyW0Va0gFxtz434LhVirV+eQs+AK0QQWtsOPw2oTvOSA4iogQqemRqvRPPbqI8nfZOz6kbCsytVa20gdw==}
+  '@vercel/sandbox@2.0.0-beta.21':
+    resolution: {integrity: sha512-mtX3mJRcLA8koekOxaVRMhgKkdgbTBZAyEfoudq+FP7sYMW0y7v8CuoVTncHu1CLe9e7/EKSsMlfui2MOMJnRA==}
 
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
@@ -2926,7 +2926,7 @@ snapshots:
 
   '@vercel/oidc@3.4.1': {}
 
-  '@vercel/sandbox@1.10.2':
+  '@vercel/sandbox@2.0.0-beta.21':
     dependencies:
       '@vercel/oidc': 3.2.0
       '@workflow/serde': 4.1.0-beta.2
