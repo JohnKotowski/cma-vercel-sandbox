@@ -12,7 +12,7 @@ Run [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/o
 
 Read the full guide for setup, architecture, and credential brokering: [Run Claude Managed Agent tools in Vercel Sandbox](https://vercel.com/guides/run-claude-managed-agent-tools-in-vercel-sandbox).
 
-For streaming long-running sessions to a client (durable polling, replay on refresh, multi-turn chat), see [Build a Claude Managed Agent on Vercel](https://vercel.com/kb/guide/claude-managed-agent-vercel) with Vercel Workflow.
+For streaming long-running sessions to a client (durable polling, replay on refresh, multi-turn chat), see [Build a Claude Managed Agent with Vercel Workflow](https://vercel.com/kb/guide/claude-managed-agent-vercel).
 
 ## Setup
 
