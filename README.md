@@ -10,7 +10,7 @@ Run [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/o
 2. A Vercel Function receives `session.status_run_started` webhooks from Anthropic, polls the work queue, and spawns a Vercel Sandbox from a prebuilt snapshot.
 3. The spawned sandbox attaches to the session event stream, executes tool calls (`run_shell`, `read_file`), and posts results back.
 
-Read the full guide for setup, architecture, and credential brokering: [Run Claude Managed Agent tools in Vercel Sandbox](https://vercel.com/guides/run-claude-managed-agent-tools-in-vercel-sandbox).
+Read the full guide for setup, architecture, and credential brokering: [Run Claude Managed Agent tools in Vercel Sandbox](https://vercel.com/kb/guide/run-claude-managed-agent-tools-with-vercel-sandbox).
 
 For streaming long-running sessions to a client (durable polling, replay on refresh, multi-turn chat), see [Build a Claude Managed Agent with Vercel Workflow](https://vercel.com/kb/guide/claude-managed-agent-vercel).
 
