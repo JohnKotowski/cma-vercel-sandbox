@@ -10,6 +10,7 @@
 #   4. Uploads plans/charges/discounts via pricing-upload
 #   5. Uploads features via POST /features (separate endpoint)
 #   6. Verifies result via management API
+#   7. Records extraction metadata (version, duration, task_id) to app_extractions
 #
 # Usage:
 #   ./scripts/upload-agent-extract.sh <slug> <json-file> [options]
@@ -19,6 +20,7 @@
 #   --dry-run            Validate and stage only, no upload
 #   --no-verify          Skip verification step
 #   --features-only      Skip pricing-upload, only upload features
+#   --task-id=UUID       Claude task ID (written to app_extractions for dashboard link)
 #
 # Examples:
 #   ./scripts/upload-agent-extract.sh airtable tmp/airtable/agent-browser-test/extract-output.json
@@ -39,6 +41,7 @@ VERSION=$(date -u +%Y%m%d)
 DRY_RUN=false
 NO_VERIFY=false
 FEATURES_ONLY=false
+TASK_ID=""
 
 for arg in "$@"; do
     case "$arg" in
@@ -46,6 +49,7 @@ for arg in "$@"; do
         --dry-run)      DRY_RUN=true ;;
         --no-verify)    NO_VERIFY=true ;;
         --features-only) FEATURES_ONLY=true ;;
+        --task-id=*)    TASK_ID="${arg#*=}" ;;
         --help|-h)
             sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
             exit 0
@@ -77,6 +81,8 @@ if [ "$PLAN_COUNT" -eq 0 ]; then
 fi
 
 FEATURE_COUNT=$(jq '[.plans[].features // [] | length] | add' "$JSON_FILE" 2>/dev/null || echo 0)
+
+UPLOAD_START_EPOCH=$(date +%s)
 
 echo "============================================================"
 echo " Agent Browser Upload: $SLUG @ $VERSION"
@@ -254,6 +260,39 @@ if [ "$NO_VERIFY" = "false" ]; then
 else
     echo ""
     echo "[6/6] Skipping verification (--no-verify)"
+fi
+
+# --- Step 7: Record extraction metadata ---
+echo ""
+echo "[7/7] Recording extraction metadata..."
+UPLOAD_END_EPOCH=$(date +%s)
+DURATION=$((UPLOAD_END_EPOCH - UPLOAD_START_EPOCH))
+SKILL_VERSION=$(cd "$EXTRACT_RABBIT_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+EXTRACT_STATUS="success"
+if [ "$FEATURES_ONLY" = "true" ]; then
+    EXTRACT_STATUS="partial"
+fi
+
+RECORD_RESP=$(curl -s -w "\n%{http_code}" -X POST "${MANAGEMENT_API_URL}/extractions" \
+    -H "X-API-Key: ${MANAGEMENT_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -nc \
+        --arg slug "$SLUG" \
+        --arg version "$VERSION" \
+        --arg method "agent_browser_cloud" \
+        --arg skill_version "$SKILL_VERSION" \
+        --arg status "$EXTRACT_STATUS" \
+        --argjson plan_count "$PLAN_COUNT" \
+        --argjson feature_count "${FEATURE_COUNT:-0}" \
+        --argjson duration_seconds "$DURATION" \
+        --arg task_id "${TASK_ID:-}" \
+        '{slug:$slug, version:$version, method:$method, skill_version:$skill_version, status:$status, plan_count:$plan_count, feature_count:$feature_count, duration_seconds:$duration_seconds, task_id:$task_id}')" 2>/dev/null)
+RECORD_HTTP=$(echo "$RECORD_RESP" | tail -1)
+if [ "$RECORD_HTTP" = "201" ]; then
+    echo "  ✅ Extraction recorded (HTTP $RECORD_HTTP, ${DURATION}s)"
+else
+    echo "  ⚠️  Failed to record extraction (HTTP $RECORD_HTTP) — non-fatal"
 fi
 
 echo ""
