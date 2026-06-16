@@ -26,8 +26,9 @@ const credentials =
     ? { token: VERCEL_TOKEN, projectId: VERCEL_PROJECT_ID, teamId: VERCEL_TEAM_ID }
     : undefined;
 
-const slug = process.argv[2];
+const slug = process.argv[2];           // single slug, or comma-separated list for a batch
 const period = process.argv[3];
+const slugs = (slug || "").split(",").map((s) => s.trim()).filter(Boolean);
 const keep = process.argv.includes("--keep");
 const force = process.argv.includes("--force");
 const probe = process.argv.includes("--probe"); // auth-only: skip the pipeline, just test that the token authenticates
@@ -75,7 +76,7 @@ async function main() {
     name: NAME,
     source: { type: "snapshot", snapshotId: SNAPSHOT },
     runtime: "node24",
-    timeout: ms("30m"),
+    timeout: ms("90m"),   // room for a 60-min diff budget (matches run.sh) + setup/batch
     ...credentials,
   });
 
@@ -110,6 +111,28 @@ async function main() {
   }
 
   // Run ONE diff. Source .env (set -a exports it so the claude child sees ANTHROPIC_API_KEY).
+  // ── Batch mode: set up once, run each slug headless with a per-diff timeout. ──
+  if (!probe && slugs.length > 1) {
+    const results: { slug: string; code: number; line: string }[] = [];
+    for (const s of slugs) {
+      const r = await sandbox.runCommand("bash", ["-c",
+        `cd ~/diff-rabbit; set -a; source .env; set +a; ${OAUTH ? "unset ANTHROPIC_API_KEY;" : ""}
+         timeout 480 ./run-pipeline.sh ${s} ${period}${force ? " --force" : ""} 2>&1 | tail -25`]);
+      const out = await r.stdout();
+      if (out) process.stdout.write(`\n──── ${s} ────\n` + out);
+      // last JSON result line, or a terminal status
+      const line = (out.match(/\{"success".*\}/g) || []).pop()
+        || (r.exitCode === 124 ? "TIMEOUT (rate-limited?)" : `exit ${r.exitCode}`);
+      results.push({ slug: s, code: r.exitCode as number, line });
+    }
+    console.log(`\n════ batch summary (${authMode}, ${((Date.now() - t0) / 1000).toFixed(0)}s) ════`);
+    for (const r of results) console.log(`  ${r.slug.padEnd(20)} exit ${r.code}  ${r.line.slice(0, 90)}`);
+    const ok = results.filter((r) => r.code === 0).length;
+    console.log(`  → ${ok}/${results.length} completed`);
+    if (!keep) { await sandbox.stop(); console.log("sandbox stopped"); }
+    process.exit(0);
+  }
+
   const runStep = probe
     // Auth probe only: a ~1-token call to confirm the token authenticates in the cloud.
     // `timeout` caps a rate-limit hang so we get a definitive answer fast + cheap.
@@ -120,11 +143,20 @@ async function main() {
        echo "--- auth probe (timeout 90s) ---"
        timeout 90 claude -p "Reply with exactly: AUTHOK" --dangerously-skip-permissions 2>&1 | head -20
        echo "--- probe exit ${"$"}{PIPESTATUS[0]:-?} ---"`
+    // Run the diff DETACHED to a logfile, with a heartbeat every 15s so the sandbox
+    // output stream never idles out ("stream ended before command finished" was a long-
+    // command stream timeout, NOT rate-limiting). Then cat the full log.
     : `cd ~/diff-rabbit
        set -a; source .env; set +a
        ${OAUTH ? "unset ANTHROPIC_API_KEY" : ""}
        echo "auth check (${authMode}): CLAUDE_CODE_OAUTH_TOKEN set=${"$"}{CLAUDE_CODE_OAUTH_TOKEN:+yes} ANTHROPIC_API_KEY set=${"$"}{ANTHROPIC_API_KEY:+yes}"
-       ./run-pipeline.sh ${slug} ${period}${force ? " --force" : ""} 2>&1`;
+       nohup ./run-pipeline.sh ${slug} ${period}${force ? " --force" : ""} > /tmp/d.log 2>&1 &
+       PID=${"$"}!
+       for i in ${"$"}(seq 1 240); do   # up to 60 min, matching run.sh's TASK_TIMEOUT
+         kill -0 ${"$"}PID 2>/dev/null || break
+         echo "··· running ${"$"}((i*15))s"; sleep 15
+       done
+       echo "=== run-pipeline log ==="; cat /tmp/d.log`;
   const code = await sh(sandbox, probe ? "run: auth probe" : "run: ./run-pipeline.sh", runStep,
     probe ? "" : "(diff can take several min) ");
 
