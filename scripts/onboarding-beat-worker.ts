@@ -100,6 +100,30 @@ function need(name: string): string {
   return v;
 }
 
+// Report the beat to mc_heartbeat_ingest (MC project) so it lands in mc_heartbeat_runs
+// and shows in Rebecca's Heartbeat tab. Auth: x-mc-secret (MC_HOOK_SECRET).
+async function postBeat(env: any, startedAt: string, secret: string, exitCode: number) {
+  const status = env?.status === "acted" ? "acted" : env?.status === "skipped" ? "skipped" : exitCode === 0 && env ? "acted" : "error";
+  const payload = {
+    agent_id: env?.agent_id || "rebecca",
+    beat_id: `hb_${Date.now()}`,
+    started_ts: startedAt,
+    ended_ts: new Date().toISOString(),
+    status,
+    summary: env?.summary ?? null,
+    actions: Array.isArray(env?.actions) ? env.actions : [],
+    goal_progress: env?.goal_progress ?? null,
+    substrate: "vercel",
+  };
+  const r = await fetch("https://qubxtjxiajxnumduwcbk.supabase.co/functions/v1/mc_heartbeat_ingest", {
+    method: "POST",
+    headers: { "x-mc-secret": secret, "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json().catch(() => ({}));
+  console.log(`beat ingest: HTTP ${r.status} ${JSON.stringify(j)}`);
+}
+
 async function main() {
   if (has("stop")) {
     try {
@@ -126,7 +150,25 @@ async function main() {
     process.exit(1);
   }
 
-  const oauthToken = need("REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN");
+  // Seat resolution. Production intent = Rebecca's dedicated onboarding seat (isolated spend).
+  // Override chain lets us fall back to the session's own seat when hers is saturated:
+  //   ONBOARDING_BEAT_OAUTH_TOKEN > REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN > CLAUDE_CODE_OAUTH_TOKEN
+  const oauthToken =
+    process.env.ONBOARDING_BEAT_OAUTH_TOKEN ||
+    process.env.REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN ||
+    process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!oauthToken) {
+    console.error(
+      "No OAuth seat token (set ONBOARDING_BEAT_OAUTH_TOKEN, REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN, or CLAUDE_CODE_OAUTH_TOKEN)."
+    );
+    process.exit(1);
+  }
+  const seatLabel = process.env.ONBOARDING_BEAT_OAUTH_TOKEN
+    ? "ONBOARDING_BEAT_OAUTH_TOKEN (override)"
+    : process.env.REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN
+    ? "REBECCA_ONBOARDING_CLAUDE_OAUTH_TOKEN (rebecca seat)"
+    : "CLAUDE_CODE_OAUTH_TOKEN (session seat)";
+  console.log(`Seat: ${seatLabel}`);
   const railSecret = process.env.PARTNER_ONBOARDING_SECRET || need("MC_HOOK_SECRET");
   const anonKey = need("SPARK_ANON_KEY");
   const queueKey = need("TASK_QUEUE_API_KEY");
@@ -176,6 +218,7 @@ async function main() {
     // this token wins → her seat, not whatever default). --dangerously-skip-permissions
     // because there is no human to approve tool calls in a headless beat.
     const prompt = beatPrompt(sponsorId, dryRun);
+    const beatStartedAt = new Date().toISOString();
     console.log(`\n→ claude -p (onboarding beat, timeout ${BEAT_TIMEOUT_S}s)\n`);
     const run = await sandbox.runCommand({
       cmd: "bash",
@@ -214,6 +257,15 @@ async function main() {
     if (!envelope) {
       console.error("No heartbeat envelope parsed from beat output — treat as error.");
       process.exitCode = 1;
+    }
+
+    // Record the beat to mc_heartbeat_ingest so it shows in Rebecca's Heartbeat tab.
+    // Live beats only — a dry run shouldn't pollute the beat log.
+    const hbSecret = process.env.MC_HOOK_SECRET || railSecret;
+    if (!dryRun && hbSecret) {
+      await postBeat(envelope, beatStartedAt, hbSecret, run.exitCode).catch((e) =>
+        console.error("beat ingest failed:", e?.message || e),
+      );
     }
   } finally {
     // Leave warm (auto-stops after idle). Use --stop to tear down between cadences.
