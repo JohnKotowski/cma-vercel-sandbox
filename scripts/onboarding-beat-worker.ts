@@ -219,12 +219,17 @@ async function main() {
     // because there is no human to approve tool calls in a headless beat.
     const prompt = beatPrompt(sponsorId, dryRun);
     const beatStartedAt = new Date().toISOString();
-    console.log(`\n→ claude -p (onboarding beat, timeout ${BEAT_TIMEOUT_S}s)\n`);
-    const run = await sandbox.runCommand({
+    console.log(`\n→ claude -p (onboarding beat, detached + poll, timeout ${BEAT_TIMEOUT_S}s)\n`);
+
+    // Launch the beat DETACHED, writing output to a file. A single long foreground stream
+    // idles out before a multi-company beat finishes (Vercel command-stream keepalive),
+    // truncating the tail — so we detach and poll instead (same pattern as the scrape runner).
+    await sandbox.runCommand({
       cmd: "bash",
       args: [
         "-c",
-        `cd /root && timeout ${BEAT_TIMEOUT_S} claude -p "$BEAT_PROMPT" --dangerously-skip-permissions`,
+        `cd /root && rm -f /tmp/beat.out /tmp/beat.done && ` +
+          `nohup bash -c 'timeout ${BEAT_TIMEOUT_S} claude -p "$BEAT_PROMPT" --dangerously-skip-permissions > /tmp/beat.out 2>&1; echo "EXIT_$?" > /tmp/beat.done' >/dev/null 2>&1 &`,
       ],
       env: {
         BEAT_PROMPT: prompt,
@@ -235,9 +240,29 @@ async function main() {
         TASK_QUEUE_API_KEY: queueKey,
         SPONSOR_ID: sponsorId,
       },
+      detached: true,
     });
-    const stdout = (await run.stdout()) || "";
-    const stderr = (await run.stderr()) || "";
+
+    // Poll for completion — short commands every 15s keep the sandbox warm and never idle out.
+    let beatExit = -1;
+    const POLL_MS = 15000;
+    const maxPolls = Math.ceil((Number(BEAT_TIMEOUT_S) + 120) / 15);
+    for (let i = 0; i < maxPolls; i++) {
+      await new Promise((r) => setTimeout(r, POLL_MS));
+      const chk = await sandbox.runCommand({ cmd: "bash", args: ["-c", "cat /tmp/beat.done 2>/dev/null || true"] });
+      const done = ((await chk.stdout()) || "").trim();
+      if (done.startsWith("EXIT_")) {
+        beatExit = parseInt(done.slice(5), 10);
+        if (Number.isNaN(beatExit)) beatExit = 0;
+        break;
+      }
+      console.log(`··· beat running ${(i + 1) * 15}s`);
+    }
+
+    const outCmd = await sandbox.runCommand({ cmd: "bash", args: ["-c", "cat /tmp/beat.out 2>/dev/null || true"] });
+    const stdout = (await outCmd.stdout()) || "";
+    const stderr = beatExit === -1 ? "beat did not finish within timeout (no EXIT marker)" : "";
+    const run = { exitCode: beatExit };
 
     // Last non-empty stdout line = the heartbeat envelope JSON.
     const lines = stdout.split("\n").filter((l) => l.trim());
