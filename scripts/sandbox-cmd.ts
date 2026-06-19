@@ -15,6 +15,15 @@ import ms from "ms";
 
 const SNAPSHOT = process.env.SANDBOX_SNAPSHOT_ID!;
 
+// Optional explicit credentials (avoids OIDC requirement in non-interactive envs)
+const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
+const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
+const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
+const credentials =
+  VERCEL_TOKEN && VERCEL_PROJECT_ID && VERCEL_TEAM_ID
+    ? { token: VERCEL_TOKEN, projectId: VERCEL_PROJECT_ID, teamId: VERCEL_TEAM_ID }
+    : undefined;
+
 const name = process.argv[2];
 if (!name) {
   console.error("Usage: sandbox-cmd <name> <command...>");
@@ -26,7 +35,7 @@ const rest = process.argv.slice(3);
 async function main() {
   if (rest[0] === "--stop") {
     try {
-      const sandbox = await Sandbox.get({ name });
+      const sandbox = await Sandbox.get({ name, ...credentials });
       await sandbox.stop();
     } catch (e: any) {
       if (e?.status !== 404) throw e;
@@ -35,11 +44,17 @@ async function main() {
     return;
   }
 
+  // Right-sizing: vCPU is tunable via SBX_VCPUS (memory tracks at 2GB/vCPU on Vercel).
+  // Default 2 (no behavior change); set SBX_VCPUS=1 to ~halve per-VM cost where the
+  // browser tolerates it. Idle timeout is also tunable (SBX_TIMEOUT, default 10m).
+  const vcpus = Number(process.env.SBX_VCPUS || 2);
   const sandbox = await Sandbox.getOrCreate({
     name,
     source: { type: "snapshot", snapshotId: SNAPSHOT },
     runtime: "node24",
-    timeout: ms("10m"),
+    timeout: ms(process.env.SBX_TIMEOUT || "10m"),
+    ...(vcpus ? { vcpus, memory: vcpus * 2048 } : {}),
+    ...credentials,
   });
 
   if (rest[0] === "--read") {
