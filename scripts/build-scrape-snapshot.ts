@@ -90,7 +90,7 @@ async function main() {
 
   console.log("\nCreating build sandbox (node24)...");
   // scrape-rabbit deps (puppeteer Chromium download + playwright Chromium + sharp native) are slow.
-  const sandbox = await Sandbox.create({ runtime: "node24", timeout: ms("30m"), ...credentials });
+  const sandbox = await Sandbox.create({ runtime: "node24", timeout: ms("30m"), keepLastSnapshots: { count: 10, deleteEvicted: true }, ...credentials });
 
   try {
     await run(sandbox, "Install python3", "sh", [

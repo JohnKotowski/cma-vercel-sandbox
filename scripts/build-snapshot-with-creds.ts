@@ -1,9 +1,11 @@
-
 import { Sandbox } from "@vercel/sandbox";
 import { readFileSync } from "node:fs";
 
-const SDK_URL =
-  "https://app.stainless.com/pkg/s/anthropic-typescript/11dd7e25acfec7caffc11c06d11629f42846b595/dist.tar.gz";
+const VERCEL_TOKEN = "REDACTED_ROTATED_2026_07_13";
+const VERCEL_PROJECT_ID = "prj_wzZL7C2opqw2j8gAht76v50nBRhI";
+const VERCEL_TEAM_ID = "team_FMfdE1Y8w0eBysZsuejV1koM";
+
+const SDK_URL = "https://app.stainless.com/pkg/s/anthropic-typescript/11dd7e25acfec7caffc11c06d11629f42846b595/dist.tar.gz";
 
 const CHROMIUM_SYSTEM_DEPS = [
   "nss", "nspr", "libxkbcommon", "atk", "at-spi2-atk", "at-spi2-core",
@@ -14,9 +16,15 @@ const CHROMIUM_SYSTEM_DEPS = [
 ];
 
 async function main() {
-  console.log("Creating sandbox...");
-  // keepLastSnapshots caps this sandbox lineage at 10 snapshots (older auto-evicted).
-  const sandbox = await Sandbox.create({ runtime: "node24", timeout: 300_000, keepLastSnapshots: { count: 10, deleteEvicted: true } });
+  console.log("Creating sandbox with explicit credentials...");
+  const sandbox = await (Sandbox as any).create({
+    runtime: "node24",
+    timeout: 300_000,
+    keepLastSnapshots: { count: 10, deleteEvicted: true },
+    token: VERCEL_TOKEN,
+    projectId: VERCEL_PROJECT_ID,
+    teamId: VERCEL_TEAM_ID,
+  });
 
   console.log("Writing runner files...");
   await sandbox.writeFiles([
@@ -26,23 +34,20 @@ async function main() {
     },
     {
       path: "/vercel/sandbox/runner.ts",
-      content: readFileSync("./sandbox/runner.ts"),
+      content: readFileSync("/Users/john/Projects/cma-vercel-sandbox/sandbox/runner.ts"),
     },
   ]);
 
   console.log("Installing Anthropic SDK + tsx...");
   await sandbox.runCommand("npm", ["install", SDK_URL, "tsx"]);
 
-  console.log("Installing Chromium system dependencies via dnf...");
-  await sandbox.runCommand("sh", [
-    "-c",
-    `sudo dnf clean all 2>&1 && sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} 2>&1 && sudo ldconfig 2>&1`,
-  ]);
+  console.log("Installing Chromium system deps...");
+  await sandbox.runCommand("sh", ["-c", `sudo dnf install -y --skip-broken ${CHROMIUM_SYSTEM_DEPS.join(" ")} 2>&1 && sudo ldconfig 2>&1`]);
 
   console.log("Installing agent-browser globally...");
   await sandbox.runCommand("npm", ["install", "-g", "agent-browser"]);
 
-  console.log("Installing agent-browser's Chromium binary...");
+  console.log("Installing agent-browser Chromium...");
   await sandbox.runCommand("npx", ["agent-browser", "install"]);
 
   console.log("Taking snapshot...");

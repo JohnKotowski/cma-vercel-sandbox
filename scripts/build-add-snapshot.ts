@@ -91,7 +91,7 @@ async function main() {
 
   console.log("\nCreating build sandbox (node24)...");
   // Chromium download + npm ci is slow; give it room.
-  const sandbox = await Sandbox.create({ runtime: "node24", timeout: ms("20m"), ...credentials });
+  const sandbox = await Sandbox.create({ runtime: "node24", timeout: ms("20m"), keepLastSnapshots: { count: 10, deleteEvicted: true }, ...credentials });
 
   try {
     await run(sandbox, "Install python3", "sh", [
