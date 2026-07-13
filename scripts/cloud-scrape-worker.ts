@@ -81,6 +81,19 @@ async function main() {
   const sandbox = await Sandbox.create({
     name: SANDBOX_NAME,
     source: { type: "snapshot", snapshotId: SNAPSHOT } as any,
+    // These are ONE-SHOT jobs: the VM claims a task, does it, and dies. It is never resumed,
+    // so it does not need its filesystem preserved. persistent:false disables the automatic
+    // filesystem snapshot Vercel otherwise takes when the sandbox stops.
+    //
+    // Leaving it on is what produced 2,885 orphaned snapshots / 3.06 TB = $248 of a $249
+    // Vercel bill (2026-07-13). Every job silently minted a ~1 GB copy of its own disk and
+    // nothing ever deleted them. The build-*-snapshot.ts scripts always capped this with
+    // keepLastSnapshots; the per-job workers never did.
+    //
+    // keepLastSnapshots is a belt-and-braces cap: if a snapshot IS taken, keep at most one and
+    // delete what it evicts.
+    persistent: false,
+    keepLastSnapshots: { count: 1, deleteEvicted: true },
     runtime: "node24",
     timeout: ms("30m"),
     ...creds,

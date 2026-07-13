@@ -137,6 +137,11 @@ async function extractSlug(
       source: { type: "snapshot", snapshotId: SNAPSHOT },
       runtime: "node24",
       timeout: ms("10m"),
+      // One-shot job, never resumed -> no filesystem restore needed. persistent:false disables the
+      // automatic ~1 GB snapshot Vercel takes on stop. Leaving it on is what produced 2,885
+      // orphaned snapshots / 3.06 TB = $248 of a $249 bill (2026-07-13). See cloud-scrape-worker.ts.
+      persistent: false,
+      keepLastSnapshots: { count: 1, deleteEvicted: true },
     });
 
     await sandbox.writeFiles([{

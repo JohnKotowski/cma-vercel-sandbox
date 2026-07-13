@@ -27,33 +27,18 @@ async function pollAndAck() {
 }
 
 async function spawn(sessionId: string, workId: string) {
-  // Broker auth at the firewall, but only attach it to endpoints scoped
-  // to THIS session and work item. A compromised sandbox can't use the
-  // injected auth to call /work/poll or read other sessions.
-  const inject = [{ headers: { authorization: `Bearer ${ENV_KEY}` } }];
-
+  // Prototype: pass auth key directly into sandbox env (not credential-brokered)
+  // so we can use allow-all network policy — agent-browser needs to reach any website.
+  // Production should use credential brokering with scoped firewall rules.
   const sandbox = await Sandbox.create({
     source: { type: "snapshot", snapshotId: SNAPSHOT_ID },
     runtime: "node24",
     timeout: ms("1h"),
-    networkPolicy: {
-      allow: {
-        "api.anthropic.com": [
-          {
-            match: { path: { startsWith: `/v1/sessions/${sessionId}/` } },
-            transform: inject,
-          },
-          {
-            match: {
-              path: {
-                startsWith: `/v1/environments/${ENV_ID}/work/${workId}/`,
-              },
-            },
-            transform: inject,
-          },
-        ],
-      },
-    },
+    // One-shot job, never resumed -> no filesystem restore needed. persistent:false disables the
+    // automatic ~1 GB snapshot Vercel takes on stop. Leaving it on is what produced 2,885
+    // orphaned snapshots / 3.06 TB = $248 of a $249 bill (2026-07-13). See cloud-scrape-worker.ts.
+    persistent: false,
+    keepLastSnapshots: { count: 1, deleteEvicted: true },
   });
 
   await sandbox.runCommand({
@@ -62,6 +47,7 @@ async function spawn(sessionId: string, workId: string) {
     cwd: "/vercel/sandbox",
     env: {
       ENVIRONMENT_ID: ENV_ID,
+      ENVIRONMENT_KEY: ENV_KEY,
       WORK_ID: workId,
       SESSION_ID: sessionId,
     },
