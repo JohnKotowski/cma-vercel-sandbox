@@ -1,7 +1,12 @@
 import { Sandbox } from "@vercel/sandbox";
 import { readFileSync } from "node:fs";
 
-const VERCEL_TOKEN = "REDACTED_ROTATED_2026_07_13";
+// NEVER hardcode this. A live Vercel PAT was committed here on 2026-06-23 and sat in local
+// history until 2026-07-13; GitHub push protection blocked every push of this branch as a
+// result, and this repo's remote (JohnKotowski/cma-vercel-sandbox) is PUBLIC. Read it from the
+// environment.
+const VERCEL_TOKEN = process.env.VERCEL_TOKEN!;
+if (!VERCEL_TOKEN) throw new Error("VERCEL_TOKEN not set (source .env.local)");
 const VERCEL_PROJECT_ID = "prj_wzZL7C2opqw2j8gAht76v50nBRhI";
 const VERCEL_TEAM_ID = "team_FMfdE1Y8w0eBysZsuejV1koM";
 
